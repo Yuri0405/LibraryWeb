@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Cors;
 using System.Text.Json;
+using Microsoft.AspNetCore.Authorization;
 
 namespace LibraryBackEnd.Controllers
 {
@@ -55,24 +56,50 @@ namespace LibraryBackEnd.Controllers
         public async Task<ActionResult<List<BookDTO>>> GetAllBooks()
         {
             string orderingParameter = Request.Query.FirstOrDefault(p => p.Key == "order").Value;
-            if(orderingParameter == "author")
+            if (orderingParameter != null)
             {
-                var books = from b in _db.Books
-                            select new BookDTO()
-                            {
-                                ID = b.ID,
-                                Title = b.Title,
-                                Author = b.Author,
-                                Raiting = (_db.Ratings.FirstOrDefault(rt => rt.BookID == b.ID)) == null?0:
-                                (int)(from rt in _db.Ratings where rt.BookID == b.ID select rt.Score).Average(),
-                                ReviewsNumber = (from rw in _db.Reviews where rw.BookID == b.ID select rw).Count()
-                            };
+                if (orderingParameter == "author")
+                {
+                    var books = from b in _db.Books
+                                select new BookDTO()
+                                {
+                                    ID = b.ID,
+                                    Title = b.Title,
+                                    Author = b.Author,
+                                    CoverURL = b.CoverUrl,
+                                    Raiting = (_db.Ratings.FirstOrDefault(rt => rt.BookID == b.ID)) == null ? 0 :
+                                    (int)(from rt in _db.Ratings where rt.BookID == b.ID select rt.Score).Average(),
+                                    ReviewsNumber = (from rw in _db.Reviews where rw.BookID == b.ID select rw).Count()
+                                };
 
-                return await books.OrderBy(p => p.Author).ToListAsync();
+                    return await books.OrderBy(p => p.Author).ToListAsync();
+                }
+                else if (orderingParameter == "title")
+                {
+                    var books = from b in _db.Books
+                                select new BookDTO()
+                                {
+                                    ID = b.ID,
+                                    Title = b.Title,
+                                    Author = b.Author,
+                                    CoverURL = b.CoverUrl,
+                                    Raiting = (_db.Ratings.FirstOrDefault(rt => rt.BookID == b.ID)) == null ? 0 :
+                                    (int)(from rt in _db.Ratings where rt.BookID == b.ID select rt.Score).Average(),
+                                    ReviewsNumber = (from rw in _db.Reviews where rw.BookID == b.ID select rw).Count()
+                                };
+
+                    return await books.OrderBy(p => p.Title).ToListAsync();
+                }
+                else
+                {
+                    return BadRequest();
+                }
             }
-            else if(orderingParameter == "title")
+            orderingParameter = Request.Query.FirstOrDefault(p => p.Key == "genre").Value;
+            if(orderingParameter != null)
             {
                 var books = from b in _db.Books
+                            where b.Genre == orderingParameter
                             select new BookDTO()
                             {
                                 ID = b.ID,
@@ -82,14 +109,13 @@ namespace LibraryBackEnd.Controllers
                                 (int)(from rt in _db.Ratings where rt.BookID == b.ID select rt.Score).Average(),
                                 ReviewsNumber = (from rw in _db.Reviews where rw.BookID == b.ID select rw).Count()
                             };
+                return await books.OrderByDescending(p => p.Raiting).ToListAsync();
+            }
 
-                return await books.OrderBy(p => p.Title).ToListAsync();
-            }
-            else
-            {
-                return Content("Something wrong");
-            }
+            return BadRequest();
+
         }
+
 
         [HttpPost("save")]
         public async Task<ActionResult<Book>> PostBook(Book book)
@@ -111,7 +137,7 @@ namespace LibraryBackEnd.Controllers
 
             return book;
         }
-
+        [Authorize]
         [HttpDelete("{id}")]
         public async Task<ActionResult> DeleteBook(int id)
         {
